@@ -19,13 +19,13 @@
         },
         "3": {
           "rolls": [
-            "-"
+            "5-"
           ],
           "cumulative": 27
         },
         "4": {
           "rolls": [
-            "4-"
+            "-7"
           ],
           "cumulative": 31
         },
@@ -80,7 +80,7 @@
       "ttl": 37
     },
     {
-      "name": "TARUN",
+      "name": "P (Player 3)",
       "frames": {
         "1": {
           "rolls": [
@@ -114,6 +114,42 @@
         "10": null
       },
       "ttl": 54
+    },
+    {
+      "name": "TARUN",
+      "frames": {
+        "1": {
+          "rolls": [
+            "6-"
+          ],
+          "cumulative": 7
+        },
+        "2": {
+          "rolls": [
+            "1/"
+          ],
+          "cumulative": 25
+        },
+        "3": {
+          "rolls": [
+            "8-"
+          ],
+          "cumulative": 33
+        },
+        "4": {
+          "rolls": [
+            "34"
+          ],
+          "cumulative": 40
+        },
+        "5": null,
+        "6": null,
+        "7": null,
+        "8": null,
+        "9": null,
+        "10": null
+      },
+      "ttl": 40
     }
   ]
 }

@@ -51,33 +51,36 @@ class ScoreboardTemporalAggregator:
 
         return True
 
-    def sanitize_roll_symbol(self, raw_text: str, player_name: str = "", frame_key: str = "") -> str:
+    def sanitize_roll_symbol(self, raw_text: str) -> str:
         """
-        Validates and standardizes bowling roll symbols.
-        Recognizes standard symbols: 'X' (Strike), '/' (Spare), '-' (Gutter), digits '0'-'9'.
+        Validates and standardizes bowling roll symbols without player or frame special-casing.
+        Recognizes standard symbols: 'X' (Strike), '/' (Spare), '-' (Gutter/Miss), digits '0'-'9'.
         Cleans known 7-segment digital font artifacts.
         """
         clean = raw_text.strip().upper()
+        if not clean:
+            return "unknown"
         if clean in ["X", "x"]:
             return "X"
-        if "4/" in clean:
-            return "4/"
-        if "5-" in clean:
-            if player_name == "JAGDISH" and frame_key == "F3":
-                return "-"
-            return "5-"
-        if "3-" in clean:
-            return "3-"
-        if "6-" in clean or clean == "6" or (player_name == "TARUN" and frame_key == "F4"):
-            return "6-"
-        if "8-" in clean or clean == "71":
-            return "8-"
-        if "9-" in clean or clean in ["81", "9"]:
-            return "9-"
-        if "4-" in clean or (player_name == "JAGDISH" and frame_key == "F4"):
-            return "4-"
-        if clean == "-" or "74" in clean or "-7" in clean or "4" in clean:
+        if "/" in clean:
+            # Matches valid spare pattern e.g. "4/", "1/"
+            m = re.search(r'([0-9]/)', clean)
+            if m:
+                return m.group(1)
+            return "/"
+        if clean in ["-", "--"]:
             return "-"
+        # Digital font OCR confusions for pin + miss/gutter (e.g. '8-', '9-', '6-', '5-', '4-', '3-'):
+        if clean == "71":
+            return "8-"
+        if clean in ["81"]:
+            return "9-"
+        if clean == "61":
+            return "6-"
+        if re.match(r'^[1-9]-$', clean):
+            return clean
+        if re.match(r'^[1-9]$', clean):
+            return f"{clean}-"
         if re.match(r'^[0-9X/\-]{1,3}$', clean):
             return clean
         return "unknown"
@@ -146,7 +149,7 @@ class ScoreboardTemporalAggregator:
                     for r in raw_rolls:
                         if not r or "unknown" in str(r):
                             continue
-                        clean_r = self.sanitize_roll_symbol(str(r), p_name, f_key)
+                        clean_r = self.sanitize_roll_symbol(str(r))
                         if clean_r != "unknown":
                             sanitized_rolls.append(clean_r)
 

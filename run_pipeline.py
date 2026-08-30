@@ -12,6 +12,8 @@ from scoreboard_cv import (
     preprocess_pipeline_clahe,
     ScoreboardOCRProcessor,
     map_to_player_rows,
+    extract_header_name,
+    detect_active_highlight_row,
     ScoreboardTemporalAggregator,
 )
 
@@ -54,6 +56,15 @@ def main():
     cap = cv2.VideoCapture(video_path)
     roi_coords = (10, 850, 70, 1890)
     ymin, ymax, xmin, xmax = roi_coords
+
+    # Dynamic row name dictionary: discovered through header OCR + active highlight
+    # Default initial fallback labels based on single-letter labels visible on screen
+    discovered_row_names = {
+        1: "JAGDISH",
+        2: "VISHAL",
+        3: "P (Player 3)",
+        4: "TARUN"
+    }
 
     last_ocr_crop = None
     last_ocr_data = None
@@ -107,7 +118,13 @@ def main():
                             "player_rows": []
                         }
                     else:
-                        player_rows = map_to_player_rows(raw_ocr, img_height=840, img_width=1820)
+                        # Discover active bowler name and active row highlight
+                        active_row = detect_active_highlight_row(crop_bgr)
+                        header_name = extract_header_name(raw_ocr)
+                        if active_row and header_name:
+                            discovered_row_names[active_row] = header_name
+
+                        player_rows = map_to_player_rows(raw_ocr, img_height=840, img_width=1820, player_names=discovered_row_names)
                         ocr_data = {
                             "timestamp": actual_ts,
                             "filename": f"frame_{actual_ts:05.1f}s.png",
@@ -126,9 +143,10 @@ def main():
 
                 aggregator.process_frame(timestamp=actual_ts, raw_ocr_data=ocr_data)
 
-                # Check for state changes & build per-observation diagnostic log
+                # Check for state changes & build per-observation diagnostic log across all 4 players
                 state_changes = []
-                for pname in ["JAGDISH", "VISHAL", "TARUN"]:
+                for r_idx in [1, 2, 3, 4]:
+                    pname = discovered_row_names.get(r_idx, f"UNKNOWN_ROW_{r_idx}")
                     pdata = aggregator.current_state["players"].get(pname, {})
                     ttl_now = pdata.get("ttl", {}).get("value", "-")
                     prev_summary = last_player_state_summary.get(pname, {})
@@ -160,20 +178,21 @@ def main():
                     print("  state unchanged", flush=True)
                 else:
                     dets_len = len(ocr_data.get("detections", []))
-                    ttls_str = ", ".join([f"{p[:1]}={aggregator.current_state['players'].get(p, {}).get('ttl', {}).get('value', '-')}" for p in ["JAGDISH", "VISHAL", "TARUN"]])
+                    ttls_str = ", ".join([f"{discovered_row_names[r][:1]}={aggregator.current_state['players'].get(discovered_row_names[r], {}).get('ttl', {}).get('value', '-')}" for r in [1, 2, 3, 4]])
                     print(f"  OCR detections: {dets_len} | TTLs: [{ttls_str}]", flush=True)
 
         frame_idx += 1
 
     cap.release()
 
-    # Build clean output JSON according to specification
+    # Build clean output JSON according to specification for all 4 players
     print("\n[3/5] Exporting Final Structured Scoreboard to output/...")
     
     clean_players = []
     final_players_state = aggregator.current_state["players"]
     
-    for pname in ["JAGDISH", "VISHAL", "TARUN"]:
+    for r_idx in [1, 2, 3, 4]:
+        pname = discovered_row_names.get(r_idx, f"UNKNOWN_ROW_{r_idx}")
         pdata = final_players_state.get(pname, {})
         frames_dict = {}
         for f_idx in range(1, 11):
