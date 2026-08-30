@@ -20,7 +20,8 @@ This project implements an automated, production-grade Computer Vision and Optic
 
 **Complete Working Demonstration**
 
-[▶ Watch the Complete Demo Video](https://drive.google.com/file/d/1ashfl_8qLsO2dmMWxu0T6NxaHEZlrvAq/view?usp=sharing)
+- 🔗 **Google Drive Stream/Download**: [▶ Watch the Complete Demo Video](https://drive.google.com/file/d/1ashfl_8qLsO2dmMWxu0T6NxaHEZlrvAq/view?usp=sharing)
+- 📦 **Repository Asset (Git LFS)**: [`docs/FOG_Assessment_Demo_Vimlesh_Tiwari.mp4`](docs/FOG_Assessment_Demo_Vimlesh_Tiwari.mp4)
 
 The demonstration shows:
 
