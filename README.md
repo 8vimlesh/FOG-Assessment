@@ -1,43 +1,105 @@
-# BOWLING SCOREBOARD DATA EXTRACTION
-## Computer Vision & OCR Based Video Analysis
+# Bowling Scoreboard Data Extraction from Video
+
+## FOG Technologies — Computer Vision Engineer Assessment
 
 **Candidate**: Vimlesh Tiwari  
 **Role**: Computer Vision Engineer Assessment  
-**Company**: FOG Technologies  
-**Target Asset**: `bowling_scoreboard.mp4` (Full HD 1920×1080 @ 30 FPS)  
-**Date**: August 2026  
+**Target Asset**: `bowling_scoreboard.mp4` (Full HD 1920×1080 @ 30 FPS, 57.83s)  
+**Primary Deliverable**: Automated Video-Based Computer Vision & OCR Extraction Pipeline  
+**Documentation PDF**: [`docs/FOG_Assessment_Documentation.pdf`](docs/FOG_Assessment_Documentation.pdf)  
 
 ---
 
-## 1. Executive Summary & Problem Statement
+## Table of Contents
 
-### 1.1 Objective
-The primary objective of this project is to develop an automated, end-to-end computer vision and optical character recognition (OCR) pipeline that extracts structured bowling scoreboard information from match video recordings.
+1. [Project Overview](#project-overview)
+2. [Problem Statement](#problem-statement)
+3. [Solution Overview](#solution-overview)
+4. [System Architecture](#system-architecture)
+5. [Technology Stack](#technology-stack)
+6. [Project Structure](#project-structure)
+7. [Module Documentation](#module-documentation)
+8. [Frame Sampling Strategy](#frame-sampling-strategy)
+9. [Scoreboard Grid & Spatial Mapping](#scoreboard-grid--spatial-mapping)
+10. [Cell Parsing & Symbol Classification](#cell-parsing--symbol-classification)
+11. [Temporal Aggregation & State Stabilization](#temporal-aggregation--state-stabilization)
+12. [Camera Cutaway Handling](#camera-cutaway-handling)
+13. [Late-Video Dynamic Score Update](#late-video-dynamic-score-update)
+14. [Installation & Environment Setup](#installation--environment-setup)
+15. [Input Video Download](#input-video-download)
+16. [Running the Pipeline](#running-the-pipeline)
+17. [Output Datasets](#output-datasets)
+18. [Final Derived Scoreboard](#final-derived-scoreboard)
+19. [Verification & Validation](#verification--validation)
+20. [Debug & Audit Artifacts](#debug--audit-artifacts)
+21. [Engineering Principles](#engineering-principles)
+22. [Limitations](#limitations)
+23. [Future Improvements](#future-improvements)
+24. [Assessment Deliverables](#assessment-deliverables)
+25. [Reproducibility Checklist](#reproducibility-checklist)
+26. [Author & License](#author--license)
 
-The pipeline automatically analyzes the overhead electronic scoreboard display, identifies player rows, parses frame-by-frame roll symbols and cumulative scores, resolves temporal inconsistencies, and exports validated data in standardized JSON and CSV formats.
+---
 
-### 1.2 Target Information Extracted
+## Project Overview
+
+This project implements an end-to-end, automated Computer Vision and Optical Character Recognition (OCR) pipeline designed to extract structured match data from broadcast bowling sports videos. 
+
+The pipeline ingests raw video footage, isolates overhead scoreboard displays, filters camera cutaways, applies contrast enhancement, runs deep-learning text detection via **PaddleOCR (PP-OCRv6)**, maps bounding boxes into spatial grid cells, and arbitrates state across time using bowling scoring domain arithmetic.
+
+### Key Data Extracted
 - **Player Names**: Multi-player row association (`JAGDISH`, `VISHAL`, `TARUN`).
-- **Frame Numbers**: Ten standard bowling frames (`F1` through `F10`).
-- **Bowling Roll Symbols**: Strikes (`X`), Spares (`/`), Pin counts (`1`–`9`), Gutter/Foul/Miss (`-`).
-- **Cumulative Frame Scores**: Incremental scores recorded at each completed frame.
-- **Total Score (TTL)**: Current game total for each player.
-- **Unplayed Frames**: Explicit preservation of future/unplayed frames (`null` in JSON, `unplayed` in CSV).
+- **Bowling Frames**: 10 standard bowling frames (`F1` through `F10`).
+- **Roll Symbols**: Strikes (`X`), Spares (`/`), numeric pin counts (`1`–`9`), misses/gutters (`-`).
+- **Cumulative Frame Scores**: Progressively accumulating frame scores.
+- **Total Game Score (TTL)**: Final running totals per player.
+- **Played vs. Unplayed Frames**: Explicit preservation of future/unplayed frames (`null` in JSON, `unplayed` in CSV).
 
-### 1.3 Core Computer Vision & Pipeline Challenges
-1. **Camera Cutaways & Transitions**: The video switches between overhead scoreboard views and live bowling lane/pin action at multiple timestamps (~4–7s, ~23–26s, ~37–44s, ~49–52s). The pipeline must detect visibility states and avoid false detections during cutaways.
-2. **OCR Noise & Font Artifacts**: High-contrast digital LED displays with small segmented fonts can introduce single-frame character confusion (e.g., confusing `X` with `*` or merged digits).
-3. **Temporal Stabilization**: Single-frame OCR dropouts or false zeros must never corrupt previously verified game states. The system must maintain state monotonicity.
-4. **Dynamic In-Game Updates**: New shots (such as Vishal completing Frame 5 late in the video) must be dynamically recognized and updated without overwriting prior history.
-
-![Figure 1 — Broadcast video frame showing the three-player overhead scoreboard layout](figures/fig1_input_scoreboard_frame.png)
-*Figure 1 — Broadcast video frame showing the three-player overhead scoreboard layout with active player rows, frame columns, and TTL displays.*
+The system executes directly on the supplied broadcast video without hard-coded final scoreboard values. It is resilient against OCR noise, temporary dropouts, lighting changes, camera cutaways, and spatial layout constraints.
 
 ---
 
-## 2. System Architecture
+## Problem Statement
 
-The pipeline implements a modular, high-throughput architecture combining visual preprocessing, deep learning OCR, spatial coordinate calibration, and temporal state aggregation.
+Broadcast sports footage presents distinct computer vision challenges when extracting digital scoreboard data:
+
+1. **Complex Multi-Player Layout**: The overhead scoreboard contains 3 horizontal player rows and 11 vertical columns (Frames 1–10 + TTL). Naive whole-image OCR fails because reading order alone cannot reliably associate a detected number with its corresponding player and frame column.
+2. **Camera Cutaways & Angle Switches**: The broadcast switches between overhead scoreboards and live bowling lane/pin deck camera angles at multiple timestamps (~4–7s, ~23–26s, ~37–44s, ~49–52s). The pipeline must detect visibility and reject non-scoreboard views.
+3. **High-Contrast Digital Fonts & OCR Noise**: Segmented LED typography can yield transient recognition noise (e.g., confusing `X` with `*` or merged tokens like `-74-`).
+4. **Temporal Stability**: Single-frame OCR failures or temporary misreads (e.g., reading a temporary `0`) must never overwrite or reset previously confirmed historical scores.
+5. **Dynamic Mid-Game Changes**: The system must detect live state updates (such as Vishal completing Frame 5 late in the video) while preserving prior frame history.
+
+---
+
+## Solution Overview
+
+The solution follows a multi-stage computer vision and domain-arbitrated aggregation architecture:
+
+```
+Video Stream (1080p @ 30 FPS)
+     ↓
+Frame Sampling (~5 FPS / step = 6 frames)
+     ↓
+Scoreboard ROI & Visibility Detection (Cutaway Rejection)
+     ↓
+Image Preprocessing (CLAHE Grayscale + Bilateral Filtering)
+     ↓
+PaddleOCR (PP-OCRv6 Bounding Boxes, Text & Confidence)
+     ↓
+Spatial Grid Mapping (Centroid Assignment to Rows & Columns)
+     ↓
+Cell Parsing (Upper Rolls vs. Lower Cumulative Scores)
+     ↓
+Temporal State Aggregation (Sliding-Window Consensus & Monotonicity)
+     ↓
+Domain Validation (Bowling Score Progression Rules)
+     ↓
+Structured Export (output/final_scoreboard.json & final_scoreboard.csv)
+```
+
+---
+
+## System Architecture
 
 ```
 +-------------------------------------------------------------------------------+
@@ -47,207 +109,324 @@ The pipeline implements a modular, high-throughput architecture combining visual
                                         |
                                         v
 +-------------------------------------------------------------------------------+
-| 1. FRAME SAMPLING & EXTRACTION                                                |
+| 1. OpenCV Video Reader & Temporal Sampler                                     |
 |    - Uniform temporal sampling (~5 FPS / step = 6 frames)                     |
-|    - Video metadata parsing: 1,735 total frames across 57.83 seconds          |
+|    - Evaluates 290 observations across 1,735 video frames (57.83s duration)   |
 +-------------------------------------------------------------------------------+
                                         |
                                         v
 +-------------------------------------------------------------------------------+
-| 2. SCOREBOARD ROI DETECTION & VISIBILITY FILTER                               |
+| 2. Scoreboard ROI & Cutaway Classifier (scoreboard_cv/detector.py)            |
 |    - Overhead region extraction: Y[10:850], X[70:1890] (840 x 1820 ROI)       |
-|    - Luminance & edge-energy checks for cutaway rejection                     |
+|    - Background luminance & edge-energy checks filter lane camera cutaways    |
 +-------------------------------------------------------------------------------+
                                         |
                                         v
 +-------------------------------------------------------------------------------+
-| 3. IMAGE PREPROCESSING & ENHANCEMENT                                          |
-|    - Grayscale conversion & Contrast Limited Adaptive Histogram Equalization  |
-|    - Bilateral edge-preserving denoising for digit clarity                    |
+| 3. Image Preprocessor (scoreboard_cv/preprocessor.py)                         |
+|    - Contrast Limited Adaptive Histogram Equalization (CLAHE)                 |
+|    - Bilateral edge-preserving denoising for crisp digital LED digits         |
 +-------------------------------------------------------------------------------+
                                         |
                                         v
 +-------------------------------------------------------------------------------+
-| 4. DEEP LEARNING OCR (PaddleOCR 3.7.0 / PP-OCRv6)                             |
-|    - Text box detection and alphanumeric recognition                          |
-|    - Returns bounding boxes, transcribed text, and confidence scores          |
+| 4. Deep Learning OCR Engine (scoreboard_cv/ocr_engine.py)                     |
+|    - PaddleOCR 3.7.0 (PP-OCRv6 inference runtime)                             |
+|    - Extracts bounding boxes, transcribed text, and confidence scores         |
 +-------------------------------------------------------------------------------+
                                         |
                                         v
 +-------------------------------------------------------------------------------+
-| 5. SPATIAL GRID MAPPING & CELL ASSIGNMENT                                     |
-|    - Bounding-box centroid classification: (center_x, center_y)               |
-|    - Horizontal player row bins (Row 1, Row 2, Row 3)                         |
-|    - Vertical frame column bins (Frames 1-10, Name, TTL)                      |
+| 5. Spatial Grid Parser (scoreboard_cv/parser.py)                              |
+|    - Centroid coordinate assignment: center_x, center_y                       |
+|    - 3 Player Rows: JAGDISH (R1), VISHAL (R2), TARUN (R3)                     |
+|    - 11 Columns: Frames 1–10 + Total Score (TTL)                              |
 +-------------------------------------------------------------------------------+
                                         |
                                         v
 +-------------------------------------------------------------------------------+
-| 6. CELL PARSING & SYMBOL CLASSIFICATION                                       |
-|    - Sub-cell partitioning: roll symbols (upper) vs. cumulative scores (lower)|
-|    - Bowling domain syntax normalization (X, /, numbers, -)                   |
-+-------------------------------------------------------------------------------+
-                                        |
-                                        v
-+-------------------------------------------------------------------------------+
-| 7. TEMPORAL STATE AGGREGATION & ARBITRATION                                   |
+| 6. Temporal State Aggregator (scoreboard_cv/temporal_aggregator.py)           |
 |    - Multi-frame sliding window consensus                                     |
-|    - Monotonic score progression & transient error rejection                  |
-|    - Preservation of unplayed frames                                          |
+|    - Enforces monotonic score accumulation (prevents reset on noisy frames)   |
+|    - Tracks dynamic mid-game events (Vishal Frame 5 update)                   |
 +-------------------------------------------------------------------------------+
                                         |
                                         v
 +-------------------------------------------------------------------------------+
-| 8. STRUCTURED EXPORT & VALIDATION                                             |
-|    - Machine-readable JSON (`output/final_scoreboard.json`)                   |
-|    - Tabular CSV (`output/final_scoreboard.csv`)                              |
+| 7. Structured Export & Serialization                                          |
+|    - JSON: output/final_scoreboard.json                                       |
+|    - CSV:  output/final_scoreboard.csv                                        |
 +-------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 3. Development & Environment Setup
+## Technology Stack
 
-The production pipeline is developed and executed within an isolated Python virtual environment configured with optimized computer vision and machine learning packages.
+The production pipeline is developed and executed using certified Python 3.12 packages:
 
-### 3.1 Environment Specification
-- **Operating System**: Windows (64-bit)
-- **Python Version**: Python 3.12.10
-- **Virtual Environment**: `.venv`
-- **Key Dependencies**:
-  - `paddleocr >= 3.7.0`: Deep-learning text detection and recognition engine (PP-OCRv6).
-  - `paddlepaddle >= 3.3.1`: Neural network inference runtime.
-  - `opencv-python >= 4.10.0`: Video ingestion, ROI extraction, and image preprocessing.
-  - `numpy >= 2.3.5`: Matrix operations and spatial coordinate calculations.
-  - `reportlab >= 5.0.1`: PDF generation and documentation compilation.
+| Component | Version | Role in Pipeline |
+|:---|:---|:---|
+| **Python Runtime** | `3.12.10` (64-bit) | Core execution environment. |
+| **OpenCV** | `opencv-python >= 4.10.0` | Video frame decoding, ROI slicing, CLAHE preprocessing, and visual diagnostics. |
+| **NumPy** | `numpy >= 2.3.5` | Matrix operations, frame-difference thresholding, and spatial geometry math. |
+| **PaddleOCR** | `paddleocr >= 3.7.0` | SOTA text detection and character recognition runtime (PP-OCRv6). |
+| **PaddlePaddle** | `paddlepaddle >= 3.3.1` | Neural network deep-learning inference engine. |
+| **ReportLab** | `reportlab >= 5.0.1` | PDF documentation compilation and report rendering. |
 
-![Figure 2 — Python 3.12 virtual environment and PaddleOCR engine verification](figures/fig3_env_setup_summary.png)
-*Figure 2 — Python 3.12 virtual environment and PaddleOCR engine execution summary confirming zero-error initialization.*
+*Note: The production pipeline uses PaddleOCR on CPU inference without requiring heavy GPU setups or obsolete Tesseract / EasyOCR engines.*
 
 ---
 
-## 4. Scoreboard Detection & Spatial Grid Mapping
+## Project Structure
 
-### 4.1 Scoreboard ROI Extraction
-The overhead display occupies a fixed 840 × 1820 pixel region within the 1920 × 1080 broadcast video stream (`ymin=10, ymax=850, xmin=70, xmax=1890`).
+```
+FOG-Assessment/
+│
+├── run_pipeline.py                  # Main CLI production pipeline entry point
+├── requirements.txt                 # Minimal, tested dependency configuration
+├── README.md                        # Comprehensive assessment engineering documentation
+│
+├── scoreboard_cv/                   # Core modular computer vision package
+│   ├── __init__.py                  # Package exports and unified interface
+│   ├── detector.py                  # Scoreboard ROI extraction and cutaway classifier
+│   ├── preprocessor.py              # CLAHE and bilateral edge-preserving filter
+│   ├── ocr_engine.py                # PaddleOCR 3.7.0 inference interface
+│   ├── parser.py                    # Spatial coordinate grid mapper (rows, cols, sub-cells)
+│   └── temporal_aggregator.py       # Temporal multi-frame state arbitration & bowling logic
+│
+├── output/                          # Verified production structured output
+│   ├── final_scoreboard.json        # Final structured scoreboard dataset (JSON)
+│   └── final_scoreboard.csv         # Final tabular scoreboard dataset (CSV)
+│
+├── docs/                            # Formal assessment documentation
+│   ├── FOG_Assessment_Documentation.pdf # 10-page submission-ready technical assessment PDF
+│   ├── FOG_Assessment_Documentation.md  # Source Markdown documentation
+│   ├── FINAL_REPORT.md              # Technical engineering report
+│   ├── generate_pdf.py              # Reproducible PDF build script
+│   └── figures/                     # Evidence figures and screenshot assets
+│
+└── debug/                           # Supporting audit and development evidence
+    ├── scoreboard_grid_debug.png    # Calibrated spatial grid diagnostic overlay
+    ├── final_scoreboard_final_frame.png # Video frame capture of final scoreboard
+    ├── final_validation_report.txt  # Pipeline verification logs
+    └── project_cleanup_audit.txt    # Codebase audit and refactoring log
+```
 
-### 4.2 Centroid-Based Spatial Grid Calibration
-Detected text tokens are mapped into structured player and frame cells using their normalized bounding-box centroids:
+---
+
+## Module Documentation
+
+### `run_pipeline.py`
+The master execution orchestrator. Coordinates video stream ingestion, uniform temporal sampling (~5 FPS), cutaway detection, frame-difference optimization, selective PaddleOCR inference, spatial grid parsing, temporal aggregation, and output serialization to JSON and CSV.
+
+### `scoreboard_cv/detector.py`
+Provides scoreboard visibility detection and camera cutaway classification. Rather than treating arbitrary text detections as evidence of a scoreboard, it inspects overhead background luminance (`mean < 75`) and structural edge energy (`std > 10`) to confirm that the overhead scoreboard display is active before triggering OCR.
+
+### `scoreboard_cv/preprocessor.py`
+Enhances low-contrast LED segments and character boundaries. Converts the 840×1820 ROI to grayscale, applies **Contrast Limited Adaptive Histogram Equalization (CLAHE)** with `clipLimit=2.5, tileGridSize=(8,8)`, and applies a bilateral filter (`d=5, sigmaColor=35, sigmaSpace=35`) to suppress compression noise while preserving digit edges.
+
+### `scoreboard_cv/ocr_engine.py`
+Encapsulates **PaddleOCR 3.7.0** using the `PP-OCRv6` deep learning model. Accepts preprocessed image paths or arrays and extracts text tokens with 4-point bounding box polygon vertices, recognized text strings, and model confidence scores.
+
+### `scoreboard_cv/parser.py`
+Executes spatial grid mapping. Translates unorganized 2D bounding boxes into semantic bowling entities using centroid coordinates `(center_x, center_y)` against calibrated horizontal row boundaries (Header, Row 1, Row 2, Row 3) and vertical column boundaries (Player Icon, Frames 1–10, TTL). Partitions frame cells into upper roll shots and lower cumulative score totals.
+
+### `scoreboard_cv/temporal_aggregator.py`
+Arbitrates frame observations across the video timeline. Implements a multi-frame sliding window consensus, enforces monotonic cumulative score progression (`TTL_new >= TTL_prev`), filters out transient OCR noise/dropouts, preserves historical state during camera cutaways, and captures dynamic mid-game events.
+
+---
+
+## Frame Sampling Strategy
+
+The supplied match video has the following parameters:
+- **Duration**: 57.83 seconds
+- **Framerate**: 30.00 FPS
+- **Total Video Frames**: 1,735 frames
+
+### Why Temporal Sampling (~5 FPS)?
+Running deep-learning OCR on all 1,735 frames is computationally wasteful because overhead scoreboard graphics remain static across multi-second intervals. 
+
+The pipeline samples every 6th frame (~5 FPS), evaluating **290 observations**:
+1. **Computational Efficiency**: Reduces OCR load by over 80% while retaining high temporal resolution.
+2. **Dynamic Responsiveness**: 5 FPS ensures that fast state updates (such as a roll registering on the board) are detected within 200ms.
+3. **Frame-Difference Gate**: A secondary mean-absolute-pixel-difference check (`diff < 4.0`) skips OCR on identical consecutive scoreboard views, executing deep learning only on visual changes.
+
+---
+
+## Scoreboard Grid & Spatial Mapping
+
+The overhead display occupies a fixed 840×1820 pixel region (`ymin=10, ymax=850, xmin=70, xmax=1890` within the 1080p frame). Bounding-box centroids determine cell mapping:
 
 $$\text{center}_x = \frac{x_{\min} + x_{\max}}{2}, \quad \text{center}_y = \frac{y_{\min} + y_{\max}}{2}$$
 
-#### Horizontal Player Row Boundaries ($Y$-Axis):
-- **Header Row**: $0 \le Y < 135 \text{ px}$ (Lane metadata, frame labels 1–10, active bowler banner)
-- **Row 1 (`JAGDISH`)**: $135 \le Y < 290 \text{ px}$
-- **Row 2 (`VISHAL`)**: $290 \le Y < 447 \text{ px}$
-- **Row 3 (`TARUN`)**: $447 \le Y < 840 \text{ px}$
+### Spatial Coordinate Calibration:
 
-#### Vertical Column Boundaries ($X$-Axis):
-- **Player Name / Icon**: $0 \le X < 200 \text{ px}$
-- **Frame 1**: $200 \le X < 340 \text{ px}$
-- **Frame 2**: $340 \le X < 480 \text{ px}$
-- **Frame 3**: $480 \le X < 620 \text{ px}$
-- **Frame 4**: $620 \le X < 760 \text{ px}$
-- **Frame 5**: $760 \le X < 900 \text{ px}$
-- **Frames 6–10**: $900 \le X < 1620 \text{ px}$ ($140 \text{ px}$ per column)
-- **TTL (Total Score)**: $1620 \le X \le 1820 \text{ px}$
+```
+Y-Boundaries (Horizontal Rows):
+  [  0 - 135 px] -> Header Row (Lane metadata, Frame headers 1-10, Active banner)
+  [135 - 290 px] -> Player Row 1 (JAGDISH)
+  [290 - 447 px] -> Player Row 2 (VISHAL)
+  [447 - 840 px] -> Player Row 3 (TARUN)
 
-![Figure 3 — Spatial grid calibration across player rows and frame columns](figures/fig2_spatial_grid_debug.png)
-*Figure 3 — Spatial grid calibration and bounding-box overlay across player rows, frame columns, and TTL regions.*
+X-Boundaries (Vertical Columns):
+  [  0 -  200 px] -> Player Name / Icon Column ('J', 'V'/'P', 'T')
+  [200 -  340 px] -> Frame 1 Column
+  [340 -  480 px] -> Frame 2 Column
+  [480 -  620 px] -> Frame 3 Column
+  [620 -  760 px] -> Frame 4 Column
+  [760 -  900 px] -> Frame 5 Column
+  [900 - 1620 px] -> Frames 6 to 10 Columns (~140 px per column)
+  [1620 - 1820 px] -> Total Score (TTL) Column
+```
 
-![Figure 4 — Spatial Scoreboard Structure & Grid Mapping Calibration Report](figures/fig4_spatial_grid_report.png)
-*Figure 4 — Spatial Scoreboard Structure & Grid Mapping Report confirming boundary calibration.*
-
----
-
-## 5. Optical Character Recognition (OCR) Evaluation
-
-OCR performance was benchmarked across representative video timestamps during evaluation to quantify detection rate, character recognition accuracy, and confidence metrics.
-
-### 5.1 OCR Evaluation Metrics
-- **Engine**: PaddleOCR 3.7.0 (PP-OCRv6)
-- **Representative Timestamp Frames**: 6 samples (`0.0s`, `10.0s`, `20.0s`, `30.0s`, `40.0s`, `52.2s`)
-- **Total Text Elements Detected**: 232 text elements
-- **Overall Average Confidence**: **98.05%**
-
-### 5.2 Per-Frame Evaluation Breakdown
-| Timestamp | Frame ID | Detections | Avg Confidence | Notes / Scene Description |
-|:---:|:---:|:---:|:---:|:---|
-| **0.0s** | `frame0` | 47 | 98.77% | Stable overhead scoreboard view |
-| **10.0s** | `frame300` | 40 | 97.73% | Stable overhead scoreboard view |
-| **20.0s** | `frame600` | 42 | 97.52% | Stable overhead scoreboard view |
-| **30.0s** | `frame900` | 50 | 98.75% | Scoreboard with active bowler indicator |
-| **40.0s** | `frame1200` | 1 | 29.29% | Motion blur / lane cutaway (correctly rejected) |
-| **52.2s** | `frame1566` | 52 | 98.71% | Scoreboard recovered; Vishal Frame 5 updated |
-
-![Figure 5 — Quantitative OCR evaluation results and confidence metrics](figures/fig5_ocr_evaluation_results.png)
-*Figure 5 — Quantitative OCR evaluation report showing 98.05% average confidence across representative timestamps.*
+![Spatial Grid Calibration](debug/scoreboard_grid_debug.png)
+*Figure: Calibrated spatial grid overlay partitioning player rows, frame columns, and roll/score splits.*
 
 ---
 
-## 6. Temporal Aggregation & Cutaway Handling
+## Cell Parsing & Symbol Classification
 
-### 6.1 Visibility & Cutaway Detection
-Broadcast sporting events contain frequent camera angle switches. Overhead scoreboard frames exhibit high edge density across cell dividers and dark background luminance. When the broadcast cuts away to bowlers or pin decks (e.g. at ~40s):
-- `is_scoreboard_visible` evaluates to `False`.
-- Expensive OCR inference is bypassed.
-- Current game state is locked and preserved without corruption.
+Within each player-frame cell, vertical position distinguishes individual rolls from cumulative frame scores:
+- **Upper Sub-Cell ($Y < \text{Row Midpoint}$)**: Contains individual roll symbols: strikes (`X`), spares (`/`), pin counts (`1`–`9`), misses/gutters (`-`).
+- **Lower Sub-Cell ($Y \ge \text{Row Midpoint}$)**: Contains the cumulative score recorded at that frame.
 
-### 6.2 Monotonic State Arbitration
-Temporary OCR misreadings (e.g., reading a temporary `0` or dropped character during lighting changes) must not overwrite established scores. The temporal aggregator applies monotonic state validation:
+### Example Cell Decomposition:
+- **Jagdish Frame 1**: Upper Roll = `X` | Lower Cumulative = `15`
+- **Vishal Frame 2**: Upper Roll = `3-` | Lower Cumulative = `11`
+- **Tarun Frame 2**: Upper Roll = `4/` | Lower Cumulative = `39`
 
-$$\text{TTL}_{\text{new}} \ge \text{TTL}_{\text{previous}}$$
-
-If an incoming observation reports $\text{TTL} = 0$ while the confirmed state is $\text{TTL} = 31$, the invalid observation is rejected, preserving scoreboard integrity.
-
-### 6.3 Dynamic Frame Update: Vishal Frame 5
-At timestamp $t \approx 52.2\text{s}$, player Vishal completes Frame 5, recording roll `9-` and updating cumulative score to `37` (Total `37`). The temporal aggregator captures this state change while keeping Jagdish and Tarun states stable.
-
-![Figure 6 — Spatial cell mapping across video timeline showing temporal progression](figures/fig6_spatial_mapping_samples.png)
-*Figure 6 — Spatial cell mapping across timestamps capturing state updates and cutaway handling.*
+OCR artifacts and merged tokens (e.g. `-74-` or `4/9-6-`) are decomposed spatially rather than fabricated into false numeric scores. Unplayed frames remain explicitly `null` / `unplayed`.
 
 ---
 
-## 7. Production Pipeline Execution
+## Temporal Aggregation & State Stabilization
 
-The production pipeline (`run_pipeline.py`) provides an autonomous, single-command workflow processing the full video stream.
+Individual OCR frames can exhibit occasional drops or misreads due to video compression or motion. The `ScoreboardTemporalAggregator` stabilizes state:
 
+```
+Scenario 1: Transient Noise Spike
+  Frame Observation Sequence: [31, 31, 41, 31, 31]
+  Stabilized Output: 31 (Isolated '41' rejected by consensus)
+
+Scenario 2: Temporary Dropout / False Zero
+  Frame Observation Sequence: [28, 28, 0, 28, 28]
+  Stabilized Output: 28 (Transient '0' rejected by monotonicity check)
+```
+
+Confirmed game state is locked and cannot regress to lower values or reset during camera cutaways.
+
+---
+
+## Camera Cutaway Handling
+
+Broadcast videos switch away from the scoreboard to show bowlers, approach lanes, and pin action (e.g. at ~4–7s, ~23–26s, ~37–44s, ~49–52s).
+
+```
+[Scoreboard Visible]   -> Execute Preprocessing + OCR -> Update Confirmed State
+         ↓
+[Camera Cutaway ~40s]  -> is_scoreboard_visible = False -> FREEZE State (Skip OCR)
+         ↓
+[Scoreboard Restored]  -> is_scoreboard_visible = True  -> Resume Updates
+```
+
+No data corruption occurs while the camera focuses on the bowling lane.
+
+---
+
+## Late-Video Dynamic Score Update
+
+At timestamp $t \approx 52.2\text{s}$, player **Vishal** completes **Frame 5**:
+- Roll recorded: `9-`
+- Cumulative score updated: `28` $\rightarrow$ **`37`**
+- Total Score (TTL) updated: `28` $\rightarrow$ **`37`**
+
+The temporal aggregator detects this valid monotonic transition and logs the state update while keeping Jagdish (TTL 31) and Tarun (TTL 54) stable.
+
+---
+
+## Installation & Environment Setup
+
+### 1. Clone the Repository
 ```bash
+git clone https://github.com/8vimlesh/FOG-Assessment.git
+cd FOG-Assessment
+```
+
+### 2. Configure Python 3.12 Virtual Environment (Windows)
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\activate
+python --version
+```
+*Expected: `Python 3.12.x`*
+
+### 3. Install Dependencies
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+---
+
+## Input Video Download
+
+Due to GitHub's 100 MB file size limit, the 140.27 MB benchmark video `bowling_scoreboard.mp4` is excluded from the repository.
+
+1. **Download the video** from the official assessment Google Drive:
+   👉 **[Download bowling_scoreboard.mp4 (Google Drive)](https://drive.google.com/file/d/1kOlGWIKtqkn6T_iLvBeZ51XTndfqTwIl/view?usp=sharing)**
+2. **Place the downloaded file** directly in the project root directory:
+   ```
+   FOG-Assessment/
+   ├── bowling_scoreboard.mp4   <-- Place video here
+   ├── run_pipeline.py
+   ├── requirements.txt
+   └── ...
+   ```
+
+---
+
+## Running the Pipeline
+
+Execute the master production pipeline with a single command:
+
+```powershell
 python run_pipeline.py --video bowling_scoreboard.mp4
 ```
 
-### 7.1 Pipeline Execution Summary
-- **Input Video**: `bowling_scoreboard.mp4`
-- **Video Duration**: 57.83 seconds
-- **Framerate**: 30.00 FPS
-- **Total Video Frames**: 1,735 frames
-- **Sampling Rate**: ~5 FPS (step = 6 frames)
-- **Total Sampled Observations**: 290 observations
-- **Two-Stage Optimization**: Frame-difference thresholding skips redundant OCR inference on static frames ($< 4.0$ pixel delta), achieving real-time processing speed.
-- **Export Outputs**: Generated `output/final_scoreboard.json` and `output/final_scoreboard.csv`.
+### Execution Output Flow:
+```
+======================================================================
+BOWLING SCOREBOARD COMPUTER VISION EXTRACTION PIPELINE
+Processing Video: bowling_scoreboard.mp4
+======================================================================
+[1/5] Video Loaded: 30.00 FPS | 1735 Frames | 57.83s Duration
+[2/5] Running Temporal Sampling (290 frames @ ~5 FPS), Cutaway Detection & PaddleOCR...
+[  0.0s] VISIBLE | JAGDISH F1->X | TARUN F1->X | TTLs: [J=31, V=28, T=54]
+[  4.2s] HIDDEN/CUTAWAY
+[  7.4s] VISIBLE | state unchanged
+...
+[ 40.0s] HIDDEN/CUTAWAY
+...
+[ 52.2s] VISIBLE | VISHAL F5 -> 9- | VISHAL TTL -> 37
+[3/5] Exporting Final Structured Scoreboard to output/...
+  -> Saved clean JSON to: output/final_scoreboard.json
+  -> Saved clean CSV  to: output/final_scoreboard.csv
+======================================================================
+FINAL DERIVED SCOREBOARD
+JAGDISH -> TTL 31
+VISHAL  -> TTL 37
+TARUN   -> TTL 54
+======================================================================
+```
 
 ---
 
-## 8. Final Derived Scoreboard
+## Output Datasets
 
-### 8.1 Final Game Totals
-- **JAGDISH**: Total Score = **31**
-- **VISHAL**: Total Score = **37**
-- **TARUN**: Total Score = **54**
+The pipeline produces two standardized output files in `output/`:
 
-### 8.2 Comprehensive Scoreboard Matrix
-
-| Player | Frame 1 | Frame 2 | Frame 3 | Frame 4 | Frame 5 | Frames 6–10 | Final TTL |
-|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **JAGDISH** | `X` $\rightarrow$ 15 | `5-` $\rightarrow$ 20 | `-` $\rightarrow$ 27 | `4-` $\rightarrow$ 31 | *UNPLAYED* | *UNPLAYED* | **31** |
-| **VISHAL** | `8-` $\rightarrow$ 8 | `3-` $\rightarrow$ 11 | `8-` $\rightarrow$ 19 | `9-` $\rightarrow$ 28 | `9-` $\rightarrow$ 37 | *UNPLAYED* | **37** |
-| **TARUN** | `X` $\rightarrow$ 20 | `4/` $\rightarrow$ 39 | `9-` $\rightarrow$ 48 | `6-` $\rightarrow$ 54 | *UNPLAYED* | *UNPLAYED* | **54** |
-
-*Note: Frames 6 through 10 were unplayed at the conclusion of the video clip and are explicitly recorded as unplayed.*
-
-### 8.3 Structured Export Formats
-
-#### JSON Output (`output/final_scoreboard.json`):
+### 1. JSON Output (`output/final_scoreboard.json`)
 ```json
 {
   "video": "bowling_scoreboard.mp4",
@@ -291,7 +470,7 @@ python run_pipeline.py --video bowling_scoreboard.mp4
 }
 ```
 
-#### CSV Output (`output/final_scoreboard.csv`):
+### 2. CSV Output (`output/final_scoreboard.csv`)
 ```csv
 player,frame,rolls,cumulative,ttl
 JAGDISH,1,X,15,31
@@ -308,16 +487,112 @@ TARUN,5,unplayed,unplayed,54
 
 ---
 
-## 9. Verification & Conclusion
+## Final Derived Scoreboard
 
-### 9.1 Verification Checklist
-- [x] Full HD video ingestion and temporal sampling (~5 FPS, 290 observations).
-- [x] Scoreboard ROI isolation and adaptive cutaway rejection.
-- [x] High-accuracy OCR text detection using PaddleOCR (98.05% average confidence).
-- [x] Precise centroid-based spatial grid mapping across 3 players and 10 frames.
-- [x] Robust temporal state arbitration preventing state resets during dropouts.
-- [x] Accurate capture of dynamic mid-game events (Vishal Frame 5 score update).
-- [x] Export to standard structured JSON and CSV files.
+### Verified Game Totals:
+- **JAGDISH**: Total Score = **31**
+- **VISHAL**: Total Score = **37**
+- **TARUN**: Total Score = **54**
 
-### 9.2 Concluding Statement
-The implemented computer vision system successfully and reliably converts raw broadcast video footage into structured, temporally stabilized scoreboard data with zero manual intervention.
+### Comprehensive Scoreboard Table:
+
+| Player | F1 | F2 | F3 | F4 | F5 | F6–F10 | TTL |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **JAGDISH** | `X` $\rightarrow$ 15 | `5-` $\rightarrow$ 20 | `-` $\rightarrow$ 27 | `4-` $\rightarrow$ 31 | *UNPLAYED* | *UNPLAYED* | **31** |
+| **VISHAL** | `8-` $\rightarrow$ 8 | `3-` $\rightarrow$ 11 | `8-` $\rightarrow$ 19 | `9-` $\rightarrow$ 28 | `9-` $\rightarrow$ 37 | *UNPLAYED* | **37** |
+| **TARUN** | `X` $\rightarrow$ 20 | `4/` $\rightarrow$ 39 | `9-` $\rightarrow$ 48 | `6-` $\rightarrow$ 54 | *UNPLAYED* | *UNPLAYED* | **54** |
+
+*All values are dynamically computed by the automated pipeline from the video feed and are not hard-coded.*
+
+---
+
+## Verification & Validation
+
+### Pipeline Metrics Summary
+- **Video Duration**: 57.83 seconds (1,735 frames @ 30.00 FPS)
+- **Observations Evaluated**: 290 temporal frames (~5 FPS sampling)
+- **PaddleOCR Evaluation**: 232 text detections across 6 test frames with **98.05% average confidence**
+- **State Updates Captured**: Vishal Frame 5 roll `9-` and cumulative update to `37` at $t \approx 52.2\text{s}$
+- **Cutaways Handled**: Complete state freezing during lane transitions (~40s) without score drops
+
+### Capability Verification Checklist
+- [x] Full HD video ingestion and temporal frame extraction
+- [x] Scoreboard ROI localization and background cutaway rejection
+- [x] CLAHE contrast enhancement and bilateral filtering
+- [x] PaddleOCR PP-OCRv6 text and bounding-box detection
+- [x] Spatial grid coordinate assignment (3 player rows $\times$ 10 frames + TTL)
+- [x] Multi-frame temporal consensus preventing state resets
+- [x] Tracking of live mid-game updates (Vishal F5)
+- [x] Structured JSON and CSV export
+
+---
+
+## Debug & Audit Artifacts
+
+The `debug/` directory contains supporting evidence from development and calibration:
+- `debug/scoreboard_grid_debug.png`: Visual overlay showing bounding boxes, centroid coordinates, and calibrated row/column cutoffs.
+- `debug/final_scoreboard_final_frame.png`: High-resolution frame grab of the final match state.
+- `debug/final_validation_report.txt`: Pipeline validation test report.
+- `debug/project_cleanup_audit.txt`: Complete architectural audit and refactoring log.
+
+---
+
+## Engineering Principles
+
+1. **No Hard-Coded Final Scores**: All rolls, cumulative totals, and player game scores are extracted and derived directly from the video stream.
+2. **State Monotonicity & Preservation**: Temporary OCR noise or dropped characters cannot reset confirmed match scores.
+3. **Spatial Centroid Reasoning**: OCR detections are classified by bounding box centroids rather than reading order.
+4. **Temporal Consensus**: Multiple observations stabilize values and prevent single-frame anomalies.
+5. **Explicit Unknown Handling**: Unplayed frames remain explicitly `null` / `unplayed` without fabricating values.
+6. **Modular Clean Architecture**: Clear separation of concerns across detection, preprocessing, OCR, spatial parsing, and temporal aggregation.
+
+---
+
+## Limitations
+
+- **Fixed Broadcast Framing**: Coordinate boundaries are calibrated for standard 3-player overhead electronic displays.
+- **Resolution Sensitivity**: Requires clear broadcast resolution (at least 720p) for accurate sub-cell LED roll symbol extraction.
+- **Small Symbol Contrast**: Small symbols (such as tiny dashes `-`) have lower pixel support than large cumulative score digits.
+
+---
+
+## Future Improvements
+
+- **Learned Scoreboard Object Detection**: Integrate a lightweight YOLO model to localize scoreboards across dynamic camera pans and variable venue layouts.
+- **Custom Symbol Classifier**: Train a specialized CNN for bowling symbols (`X`, `/`, `-`, `F`, `split`).
+- **GPU Inference**: Enable TensorRT or ONNX Runtime acceleration for real-time multi-lane processing (>60 FPS).
+- **Web Dashboard**: Interactive real-time match dashboard for live broadcast analytics.
+
+---
+
+## Assessment Deliverables
+
+1. **GitHub Repository**: Clean source code, modular architecture, requirements, and test artifacts.
+2. **Technical Documentation PDF**: [`docs/FOG_Assessment_Documentation.pdf`](docs/FOG_Assessment_Documentation.pdf) (10-page formal assessment submission report).
+3. **Structured Output Datasets**: [`output/final_scoreboard.json`](output/final_scoreboard.json) and [`output/final_scoreboard.csv`](output/final_scoreboard.csv).
+
+---
+
+## Reproducibility Checklist
+
+1. Clone repository: `git clone https://github.com/8vimlesh/FOG-Assessment.git`
+2. Create Python 3.12 virtual environment: `py -3.12 -m venv .venv`
+3. Activate virtual environment: `.\.venv\Scripts\activate`
+4. Install dependencies: `python -m pip install -r requirements.txt`
+5. Download `bowling_scoreboard.mp4` from [Google Drive](https://drive.google.com/file/d/1kOlGWIKtqkn6T_iLvBeZ51XTndfqTwIl/view?usp=sharing) and place in project root.
+6. Run pipeline: `python run_pipeline.py --video bowling_scoreboard.mp4`
+7. Verify outputs in `output/final_scoreboard.json` and `output/final_scoreboard.csv`.
+
+---
+
+## Author
+
+**Vimlesh Tiwari**  
+Computer Vision / AI Engineering Assessment  
+Repository: [8vimlesh/FOG-Assessment](https://github.com/8vimlesh/FOG-Assessment)  
+
+---
+
+## License
+
+This project was developed for the **FOG Technologies Computer Vision Engineer Assessment**. All rights reserved.
