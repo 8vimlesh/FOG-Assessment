@@ -1,0 +1,119 @@
+{
+  "video": "bowling_scoreboard.mp4",
+  "total_duration_seconds": 57.83,
+  "players": [
+    {
+      "name": "JAGDISH",
+      "frames": {
+        "1": {
+          "rolls": [
+            "X"
+          ],
+          "cumulative": 15
+        },
+        "2": {
+          "rolls": [
+            "5-"
+          ],
+          "cumulative": 20
+        },
+        "3": {
+          "rolls": [
+            "-"
+          ],
+          "cumulative": 27
+        },
+        "4": {
+          "rolls": [
+            "4-"
+          ],
+          "cumulative": 31
+        },
+        "5": null,
+        "6": null,
+        "7": null,
+        "8": null,
+        "9": null,
+        "10": null
+      },
+      "ttl": 31
+    },
+    {
+      "name": "VISHAL",
+      "frames": {
+        "1": {
+          "rolls": [
+            "8-"
+          ],
+          "cumulative": 8
+        },
+        "2": {
+          "rolls": [
+            "3-"
+          ],
+          "cumulative": 11
+        },
+        "3": {
+          "rolls": [
+            "8-"
+          ],
+          "cumulative": 19
+        },
+        "4": {
+          "rolls": [
+            "9-"
+          ],
+          "cumulative": 28
+        },
+        "5": {
+          "rolls": [
+            "9-"
+          ],
+          "cumulative": 37
+        },
+        "6": null,
+        "7": null,
+        "8": null,
+        "9": null,
+        "10": null
+      },
+      "ttl": 37
+    },
+    {
+      "name": "TARUN",
+      "frames": {
+        "1": {
+          "rolls": [
+            "X"
+          ],
+          "cumulative": 20
+        },
+        "2": {
+          "rolls": [
+            "4/"
+          ],
+          "cumulative": 39
+        },
+        "3": {
+          "rolls": [
+            "9-"
+          ],
+          "cumulative": 48
+        },
+        "4": {
+          "rolls": [
+            "6-"
+          ],
+          "cumulative": 54
+        },
+        "5": null,
+        "6": null,
+        "7": null,
+        "8": null,
+        "9": null,
+        "10": null
+      },
+      "ttl": 54
+    }
+  ]
+}

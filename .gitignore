@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+*.pyc
+.paddlex/
+bowling_scoreboard.mp4
