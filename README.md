@@ -16,6 +16,28 @@ This project implements an automated, production-grade Computer Vision and Optic
 
 ---
 
+## 🎥 Demo Video
+
+**Complete Working Demonstration**
+
+[▶ Watch the Complete Demo Video](https://drive.google.com/file/d/1ashfl_8qLsO2dmMWxu0T6NxaHEZlrvAq/view?usp=sharing)
+
+The demonstration shows:
+
+- Input bowling scoreboard video
+- Project structure and source code
+- Production pipeline execution
+- Scoreboard detection
+- OCR extraction
+- Spatial scoreboard mapping
+- Temporal state processing
+- Final extracted scoreboard
+- JSON / CSV output
+
+> The demo video demonstrates the complete end-to-end working Computer Vision pipeline using the supplied bowling scoreboard video.
+
+---
+
 ### Quick Architecture
 
 ```
@@ -50,9 +72,7 @@ python -m venv .venv
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Download bowling_scoreboard.mp4 (see Input Video section) and place in project root
-
-# 4. Run the end-to-end pipeline
+# 3. Run the end-to-end pipeline (input video bowling_scoreboard.mp4 is included)
 python run_pipeline.py --video bowling_scoreboard.mp4
 ```
 
@@ -80,28 +100,29 @@ TARUN   → 54
 
 ## Table of Contents
 
-1. [Problem Statement](#problem-statement)
-2. [System Architecture](#system-architecture)
-3. [Module Responsibilities & Project Structure](#module-responsibilities--project-structure)
-4. [Frame Sampling Strategy](#frame-sampling-strategy)
-5. [Scoreboard ROI & Visibility Detection](#scoreboard-roi--visibility-detection)
-6. [Image Preprocessing](#image-preprocessing)
-7. [Deep Learning Text Recognition (PaddleOCR)](#deep-learning-text-recognition-paddleocr)
-8. [Spatial Grid Mapping](#spatial-grid-mapping)
-9. [Cell Parsing & Symbol Classification](#cell-parsing--symbol-classification)
-10. [Temporal Aggregation & State Stabilization](#temporal-aggregation--state-stabilization)
-11. [Camera Cutaway Handling & State Preservation](#camera-cutaway-handling--state-preservation)
-12. [Late-Video Dynamic Score Update](#late-video-dynamic-score-update)
-13. [Input Video Download (Google Drive)](#input-video-download-google-drive)
-14. [Installation & Setup](#installation--setup)
-15. [Usage & Execution](#usage--execution)
-16. [Output Files](#output-files)
-17. [Verification & Validation](#verification--validation)
-18. [Debug & Audit Evidence](#debug--audit-evidence)
-19. [Engineering Principles & Design Decisions](#engineering-principles--design-decisions)
-20. [Limitations](#limitations)
-21. [Future Improvements](#future-improvements)
-22. [Assessment Deliverables](#assessment-deliverables)
+1. [Demo Video](#-demo-video)
+2. [Problem Statement](#problem-statement)
+3. [System Architecture](#system-architecture)
+4. [Module Responsibilities & Project Structure](#module-responsibilities--project-structure)
+5. [Frame Sampling Strategy](#frame-sampling-strategy)
+6. [Scoreboard ROI & Visibility Detection](#scoreboard-roi--visibility-detection)
+7. [Image Preprocessing](#image-preprocessing)
+8. [Deep Learning Text Recognition (PaddleOCR)](#deep-learning-text-recognition-paddleocr)
+9. [Spatial Grid Mapping](#spatial-grid-mapping)
+10. [Cell Parsing & Symbol Classification](#cell-parsing--symbol-classification)
+11. [Temporal Aggregation & State Stabilization](#temporal-aggregation--state-stabilization)
+12. [Camera Cutaway Handling & State Preservation](#camera-cutaway-handling--state-preservation)
+13. [Late-Video Dynamic Score Update](#late-video-dynamic-score-update)
+14. [Input Video](#input-video)
+15. [Installation & Setup](#installation--setup)
+16. [Usage & Execution](#usage--execution)
+17. [Output Files](#output-files)
+18. [Verification & Validation](#verification--validation)
+19. [Debug & Audit Evidence](#debug--audit-evidence)
+20. [Engineering Principles & Design Decisions](#engineering-principles--design-decisions)
+21. [Limitations](#limitations)
+22. [Future Improvements](#future-improvements)
+23. [Assessment Deliverables](#assessment-deliverables)
 
 ---
 
@@ -369,20 +390,24 @@ The temporal aggregator registers this valid forward progression while preservin
 
 ---
 
-## Input Video Download (Google Drive)
+## Input Video
 
-Because GitHub has a 100 MB file size limit, the 140.27 MB benchmark video `bowling_scoreboard.mp4` is intentionally excluded from the Git repository via `.gitignore` and must be downloaded separately.
+The assessment input video, `bowling_scoreboard.mp4`, is included in the repository for reproducibility.
 
-1. **Download the video** from Google Drive:
-   👉 **[Download bowling_scoreboard.mp4 (Google Drive)](https://drive.google.com/file/d/1kOlGWIKtqkn6T_iLvBeZ51XTndfqTwIl/view?usp=sharing)**
-2. **Place the downloaded file** directly into the project root directory:
-   ```
-   FOG-Assessment/
-   ├── bowling_scoreboard.mp4   <-- Place video here
-   ├── run_pipeline.py
-   ├── requirements.txt
-   └── ...
-   ```
+```text
+bowling_scoreboard.mp4
+```
+
+```
+FOG-Assessment/
+├── bowling_scoreboard.mp4   # Included benchmark video (1080p, 57.83s)
+├── run_pipeline.py
+├── requirements.txt
+└── ...
+```
+
+> **Google Drive Mirror**: The input video is also mirrored online for convenience:  
+> 👉 **[Download bowling_scoreboard.mp4 (Google Drive)](https://drive.google.com/file/d/1kOlGWIKtqkn6T_iLvBeZ51XTndfqTwIl/view?usp=sharing)**
 
 ---
 
@@ -568,9 +593,10 @@ The `debug/` directory contains supporting diagnostic files:
 ## Assessment Deliverables
 
 1. **GitHub Repository**: Complete production codebase, modular package, requirements, and test artifacts.
-2. **Technical Documentation PDF**: [`docs/FOG_Assessment_Documentation.pdf`](docs/FOG_Assessment_Documentation.pdf) (10-page formal assessment submission report).
-3. **Structured Output Datasets**: [`output/final_scoreboard.json`](output/final_scoreboard.json) and [`output/final_scoreboard.csv`](output/final_scoreboard.csv).
-4. **Primary Pipeline Runner**: [`run_pipeline.py`](run_pipeline.py).
+2. **Demo Video**: [▶ Complete Working Demonstration Video](https://drive.google.com/file/d/1ashfl_8qLsO2dmMWxu0T6NxaHEZlrvAq/view?usp=sharing).
+3. **Technical Documentation PDF**: [`docs/FOG_Assessment_Documentation.pdf`](docs/FOG_Assessment_Documentation.pdf) (10-page formal assessment submission report).
+4. **Structured Output Datasets**: [`output/final_scoreboard.json`](output/final_scoreboard.json) and [`output/final_scoreboard.csv`](output/final_scoreboard.csv).
+5. **Primary Pipeline Runner**: [`run_pipeline.py`](run_pipeline.py).
 
 ---
 

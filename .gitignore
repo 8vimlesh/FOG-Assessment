@@ -2,4 +2,5 @@
 __pycache__/
 *.pyc
 .paddlex/
-bowling_scoreboard.mp4
+docs/*.mp4*
+
