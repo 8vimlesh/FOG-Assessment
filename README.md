@@ -62,6 +62,10 @@
 ![Code Running - Pipeline Startup](docs/figures/screenshot_code_running_start.png)
 *Pipeline startup showing video ingestion and PaddleOCR model initialization.*
 
+#### Environment Verification
+![Environment Summary](docs/figures/fig3_environment_summary.png)
+*Python/PaddleOCR environment verification evidence included with the assessment documentation.*
+
 #### Frame Tracking & Symbol Extraction
 ![Code Running - Frame Tracking](docs/figures/screenshot_code_running_tracking.png)
 *Runtime evidence showing temporal tracking and bowling-symbol extraction.*
