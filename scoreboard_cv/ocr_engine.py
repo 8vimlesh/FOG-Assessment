@@ -29,7 +29,10 @@ class ScoreboardOCRProcessor:
             )
             print("[OCRProcessor] PaddleOCR engine ready.")
         except Exception as e:
-            print(f"[OCRProcessor] Warning initializing PaddleOCR: {e}")
+            raise RuntimeError(
+                f"PaddleOCR failed to initialize ({e}). Run the pipeline using the repository "
+                r"virtual environment: .venv\Scripts\python run_pipeline.py"
+            ) from e
 
     def run_ocr(self, img_input) -> list:
         """
