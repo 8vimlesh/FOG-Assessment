@@ -5,6 +5,7 @@
 **Role**: Computer Vision Engineer Assessment  
 **Company**: FOG Technologies  
 **Target Asset**: `bowling_scoreboard.mp4` (Full HD 1920×1080 @ 30 FPS)  
+**Demo Video**: [▶ Watch Working Demo Video (Google Drive)](https://drive.google.com/file/d/1895Fc06iCq8DKqnsbnUxGxlF1NB_CcF6/view?usp=sharing)  
 **Date**: August 2026  
 
 ---

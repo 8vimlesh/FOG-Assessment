@@ -20,7 +20,7 @@ This project implements an automated, production-grade Computer Vision and Optic
 
 **Complete Working Demonstration**
 
-- 🔗 **Google Drive Stream/Download**: [▶ Watch the Complete Demo Video](https://drive.google.com/file/d/1ashfl_8qLsO2dmMWxu0T6NxaHEZlrvAq/view?usp=sharing)
+- 🔗 **Google Drive Stream/Download**: [▶ Watch the Complete Demo Video](https://drive.google.com/file/d/1895Fc06iCq8DKqnsbnUxGxlF1NB_CcF6/view?usp=sharing)
 - 📦 **Repository Asset (Git LFS)**: [`docs/FOG_Assessment_Demo_Vimlesh_Tiwari.mp4`](docs/FOG_Assessment_Demo_Vimlesh_Tiwari.mp4)
 
 The demonstration shows:
@@ -665,7 +665,7 @@ The `debug/` directory contains supporting diagnostic files:
 ## Assessment Deliverables
 
 1. **GitHub Repository**: Complete production codebase, modular package, requirements, and test artifacts.
-2. **Demo Video**: [▶ Complete Working Demonstration Video](https://drive.google.com/file/d/1ashfl_8qLsO2dmMWxu0T6NxaHEZlrvAq/view?usp=sharing) / [`docs/FOG_Assessment_Demo_Vimlesh_Tiwari.mp4`](docs/FOG_Assessment_Demo_Vimlesh_Tiwari.mp4).
+2. **Demo Video**: [▶ Complete Working Demonstration Video](https://drive.google.com/file/d/1895Fc06iCq8DKqnsbnUxGxlF1NB_CcF6/view?usp=sharing) / [`docs/FOG_Assessment_Demo_Vimlesh_Tiwari.mp4`](docs/FOG_Assessment_Demo_Vimlesh_Tiwari.mp4).
 3. **Technical Documentation PDF**: [`docs/FOG_Assessment_Documentation.pdf`](docs/FOG_Assessment_Documentation.pdf) (10-page formal assessment submission report).
 4. **Structured Output Datasets**: [`output/final_scoreboard.json`](output/final_scoreboard.json) and [`output/final_scoreboard.csv`](output/final_scoreboard.csv).
 5. **Primary Pipeline Runner**: [`run_pipeline.py`](run_pipeline.py).
