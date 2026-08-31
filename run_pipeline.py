@@ -58,12 +58,12 @@ def main():
     ymin, ymax, xmin, xmax = roi_coords
 
     # Dynamic row name dictionary: discovered through header OCR + active highlight
-    # Default initial fallback labels based on single-letter labels visible on screen
+    # Initialized to unknown row placeholders
     discovered_row_names = {
-        1: "JAGDISH",
-        2: "VISHAL",
-        3: "P (Player 3)",
-        4: "TARUN"
+        1: "UNKNOWN_ROW_1",
+        2: "UNKNOWN_ROW_2",
+        3: "UNKNOWN_ROW_3",
+        4: "UNKNOWN_ROW_4",
     }
 
     last_ocr_crop = None
@@ -146,10 +146,10 @@ def main():
                 # Check for state changes & build per-observation diagnostic log across all 4 players
                 state_changes = []
                 for r_idx in [1, 2, 3, 4]:
-                    pname = discovered_row_names.get(r_idx, f"UNKNOWN_ROW_{r_idx}")
-                    pdata = aggregator.current_state["players"].get(pname, {})
+                    pdata = aggregator.current_state["players"].get(r_idx, {})
+                    pname = pdata.get("name", discovered_row_names.get(r_idx, f"UNKNOWN_ROW_{r_idx}"))
                     ttl_now = pdata.get("ttl", {}).get("value", "-")
-                    prev_summary = last_player_state_summary.get(pname, {})
+                    prev_summary = last_player_state_summary.get(r_idx, {})
                     prev_ttl = prev_summary.get("ttl", "-")
 
                     # Check frame roll changes
@@ -165,7 +165,7 @@ def main():
                         state_changes.append(f"{pname} TTL -> {ttl_now}")
 
                     # Update player state summary
-                    last_player_state_summary[pname] = {
+                    last_player_state_summary[r_idx] = {
                         "ttl": ttl_now,
                         "frames": {f"F{f_i}": {"rolls": list(pdata.get("frames", {}).get(f"F{f_i}", {}).get("rolls", []))} for f_i in range(1, 11)}
                     }
@@ -178,7 +178,7 @@ def main():
                     print("  state unchanged", flush=True)
                 else:
                     dets_len = len(ocr_data.get("detections", []))
-                    ttls_str = ", ".join([f"{discovered_row_names[r][:1]}={aggregator.current_state['players'].get(discovered_row_names[r], {}).get('ttl', {}).get('value', '-')}" for r in [1, 2, 3, 4]])
+                    ttls_str = ", ".join([f"{discovered_row_names[r][:1]}={aggregator.current_state['players'].get(r, {}).get('ttl', {}).get('value', '-')}" for r in [1, 2, 3, 4]])
                     print(f"  OCR detections: {dets_len} | TTLs: [{ttls_str}]", flush=True)
 
         frame_idx += 1
@@ -192,8 +192,8 @@ def main():
     final_players_state = aggregator.current_state["players"]
     
     for r_idx in [1, 2, 3, 4]:
-        pname = discovered_row_names.get(r_idx, f"UNKNOWN_ROW_{r_idx}")
-        pdata = final_players_state.get(pname, {})
+        pdata = final_players_state.get(r_idx, {})
+        pname = pdata.get("name", discovered_row_names.get(r_idx, f"UNKNOWN_ROW_{r_idx}"))
         frames_dict = {}
         for f_idx in range(1, 11):
             fk = f"F{f_idx}"

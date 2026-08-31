@@ -24,6 +24,10 @@ ymin, ymax, xmin, xmax = roi_coords
 
 frame_idx = 0
 results = []
+last_crop = None
+last_dets = []
+last_hdr = None
+
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -33,13 +37,24 @@ while cap.isOpened():
         if is_scoreboard_visible(frame, roi_coords):
             crop_bgr = frame[ymin:ymax, xmin:xmax]
             active_row = detect_active_highlight_row(crop_bgr)
-            prep_img = preprocess_pipeline_clahe(crop_bgr, scale=1.0)
-            prep_path = f"debug/scratch_test_{ts:.1f}s.png"
-            cv2.imwrite(prep_path, prep_img)
-            dets = ocr_processor.run_ocr(prep_path)
-            if os.path.exists(prep_path):
-                os.remove(prep_path)
-            hdr = extract_header_name(dets)
+            need_ocr = True
+            if last_crop is not None:
+                diff = float(np.mean(cv2.absdiff(crop_bgr, last_crop)))
+                if diff < 4.0:
+                    need_ocr = False
+                    dets = last_dets
+                    hdr = last_hdr
+            if need_ocr:
+                prep_img = preprocess_pipeline_clahe(crop_bgr, scale=1.0)
+                prep_path = f"debug/scratch_test_{ts:.1f}s.png"
+                cv2.imwrite(prep_path, prep_img)
+                dets = ocr_processor.run_ocr(prep_path)
+                if os.path.exists(prep_path):
+                    os.remove(prep_path)
+                hdr = extract_header_name(dets)
+                last_crop = crop_bgr.copy()
+                last_dets = dets
+                last_hdr = hdr
             results.append({
                 "ts": ts,
                 "active_row": active_row,
@@ -47,10 +62,10 @@ while cap.isOpened():
                 "dets": dets
             })
             if active_row or hdr:
-                print(f"[{ts:5.1f}s] Active Row: {active_row}, Header Name: {hdr}")
+                print(f"[{ts:5.1f}s] Active Row: {active_row}, Header Name: {hdr}", flush=True)
     frame_idx += 1
 cap.release()
 
 with open("debug/scratch_ocr_dump.json", "w") as f:
     json.dump(results, f, indent=2)
-print("Dump completed.")
+print("Dump completed.", flush=True)

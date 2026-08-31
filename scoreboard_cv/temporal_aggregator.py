@@ -53,9 +53,8 @@ class ScoreboardTemporalAggregator:
 
     def sanitize_roll_symbol(self, raw_text: str) -> str:
         """
-        Validates and standardizes bowling roll symbols without player or frame special-casing.
+        Validates and standardizes bowling roll symbols.
         Recognizes standard symbols: 'X' (Strike), '/' (Spare), '-' (Gutter/Miss), digits '0'-'9'.
-        Cleans known 7-segment digital font artifacts.
         """
         clean = raw_text.strip().upper()
         if not clean:
@@ -70,16 +69,15 @@ class ScoreboardTemporalAggregator:
             return "/"
         if clean in ["-", "--"]:
             return "-"
-        # Digital font OCR confusions for pin + miss/gutter (e.g. '8-', '9-', '6-', '5-', '4-', '3-'):
-        if clean == "71":
-            return "8-"
-        if clean in ["81"]:
-            return "9-"
-        if clean == "61":
-            return "6-"
-        if re.match(r'^[1-9]-$', clean):
+        # Standard roll patterns:
+        # 1. Miss on ball 1 or 2 with digit: e.g. "-7", "4-", "5-", "8-", "9-", "6-"
+        if re.match(r'^\-[0-9]$', clean) or re.match(r'^[0-9]\-$', clean):
             return clean
-        if re.match(r'^[1-9]$', clean):
+        # 2. Two distinct roll digits in one frame: e.g. "61", "34", "81", "71"
+        if re.match(r'^[0-9]{2}$', clean):
+            return clean
+        # 3. Single digit: standardize to digit + miss
+        if re.match(r'^[0-9]$', clean):
             return f"{clean}-"
         if re.match(r'^[0-9X/\-]{1,3}$', clean):
             return clean
@@ -89,6 +87,7 @@ class ScoreboardTemporalAggregator:
         """
         Processes a single chronological frame observation with state preservation.
         """
+        from .validator import parse_roll_pins
         self.total_frames += 1
         is_visible = self.check_scoreboard_visibility(raw_ocr_data)
 
@@ -108,11 +107,11 @@ class ScoreboardTemporalAggregator:
         # Process each player row passed from spatial parser
         for row in player_rows:
             r_idx = row["row_index"]
-            p_name = row.get("player_name", f"PLAYER_{r_idx}")
+            p_name = row.get("player_name", f"UNKNOWN_ROW_{r_idx}")
 
-            # Initialize player state if not present
-            if p_name not in self.current_state["players"]:
-                self.current_state["players"][p_name] = {
+            # Initialize player state by row index 1..4 so state is stable even before name discovery
+            if r_idx not in self.current_state["players"]:
+                self.current_state["players"][r_idx] = {
                     "row_index": r_idx,
                     "name": p_name,
                     "frames": {
@@ -129,7 +128,10 @@ class ScoreboardTemporalAggregator:
                     }
                 }
 
-            p_state = self.current_state["players"][p_name]
+            p_state = self.current_state["players"][r_idx]
+            # Update name if a discovered real name is available
+            if p_name and not p_name.startswith("UNKNOWN_ROW_"):
+                p_state["name"] = p_name
 
             # Process Frames F1..F10 per cell
             frames_dict = row.get("frames", {})
@@ -154,7 +156,7 @@ class ScoreboardTemporalAggregator:
                             sanitized_rolls.append(clean_r)
 
                     if sanitized_rolls:
-                        roll_hist_key = (p_name, f_key, "rolls")
+                        roll_hist_key = (r_idx, f_key, "rolls")
                         if roll_hist_key not in self.cell_history:
                             self.cell_history[roll_hist_key] = deque(maxlen=self.window_size)
                         
@@ -174,7 +176,7 @@ class ScoreboardTemporalAggregator:
                 if raw_cum is not None and str(raw_cum).isdigit() and "unknown" not in str(raw_cum):
                     cum_val = int(raw_cum)
                     if 0 < cum_val <= 300:
-                        cum_hist_key = (p_name, f_key, "cumulative")
+                        cum_hist_key = (r_idx, f_key, "cumulative")
                         if cum_hist_key not in self.cell_history:
                             self.cell_history[cum_hist_key] = deque(maxlen=self.window_size)
                         
@@ -190,7 +192,7 @@ class ScoreboardTemporalAggregator:
                 # Log CSV row per frame
                 self.csv_rows.append({
                     "timestamp": round(timestamp, 2),
-                    "player": p_name,
+                    "player": p_state["name"],
                     "frame": f_key,
                     "rolls": "/".join(f_state["rolls"]) if f_state["rolls"] else "none",
                     "cumulative": f_state["cumulative"] if f_state["cumulative"] is not None else "unknown",
@@ -204,7 +206,7 @@ class ScoreboardTemporalAggregator:
                 if p_state["frames"][fk]["rolls"] and p_state["frames"][fk]["cumulative"] is None:
                     prev_cum = int(p_state["frames"][f"F{f_i-1}"]["cumulative"]) if f_i > 1 and str(p_state["frames"][f"F{f_i-1}"]["cumulative"]).isdigit() else 0
                     roll_txt = p_state["frames"][fk]["rolls"][0]
-                    pins = int(roll_txt.replace("-", "")) if roll_txt.replace("-", "").isdigit() else 0
+                    pins = sum(parse_roll_pins(roll_txt))
                     new_cum = prev_cum + pins
                     if new_cum > 0:
                         p_state["frames"][fk]["cumulative"] = str(new_cum)

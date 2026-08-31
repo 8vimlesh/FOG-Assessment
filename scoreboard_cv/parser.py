@@ -64,7 +64,7 @@ def detect_active_highlight_row(crop_bgr: np.ndarray) -> int:
 def map_to_player_rows(detections: list, img_height: int = 840, img_width: int = 1820, player_names: dict = None) -> list:
     """
     Maps 2D OCR detections into 4 horizontal player rows (Rows 1..4) and 10 frame columns + TTL
-    using calibrated spatial bounding box center coordinates across the full 840px ROI.
+    using calibrated spatial bounding box coordinates across the full 840px ROI.
     - Row 1: [135, 290) -> Rolls: [135, 205), Cum: [205, 290)
     - Row 2: [290, 460) -> Rolls: [290, 370), Cum: [370, 460)
     - Row 3: [460, 630) -> Rolls: [460, 535), Cum: [535, 630)
@@ -77,7 +77,13 @@ def map_to_player_rows(detections: list, img_height: int = 840, img_width: int =
         "F8": (1180, 1320), "F9": (1320, 1460), "F10": (1460, 1630), "TTL": (1630, 1820)
     }
 
-    default_names = {1: "JAGDISH", 2: "VISHAL", 3: "P (Player 3)", 4: "TARUN"}
+    def get_column_for_x(x: float) -> str:
+        for c_name, (c_x1, c_x2) in col_bounds.items():
+            if c_x1 <= x < c_x2:
+                return c_name
+        return "TTL" if x >= 1630 else "NAME"
+
+    default_names = {1: "UNKNOWN_ROW_1", 2: "UNKNOWN_ROW_2", 3: "UNKNOWN_ROW_3", 4: "UNKNOWN_ROW_4"}
     names_map = player_names if player_names is not None else default_names
 
     rows = []
@@ -128,48 +134,60 @@ def map_to_player_rows(detections: list, img_height: int = 840, img_width: int =
         r_dict = rows[r_idx]
         r_dict["raw_items"].append(det)
 
-        # Assign Column strictly by calibrated horizontal position
-        assigned_col = None
-        for c_name, (c_x1, c_x2) in col_bounds.items():
-            if c_x1 <= center_x < c_x2:
-                assigned_col = c_name
-                break
-        if not assigned_col:
-            assigned_col = "TTL" if center_x >= 1630 else "NAME"
+        is_roll = (center_y < split_y)
 
-        if assigned_col == "NAME":
-            continue
-        elif assigned_col == "TTL":
-            digits = re.sub(r'[^0-9]', '', text)
-            if digits and int(digits) > 0 and (r_dict["ttl_value"] == "unknown" or conf > r_dict["ttl_confidence"]):
-                r_dict["ttl_value"] = digits
-                r_dict["ttl_confidence"] = conf
-        else:
-            f_cell = r_dict["frames"][assigned_col]
-            f_cell["raw_detections"].append(det)
+        # Check if single item or multi-column merged detection
+        is_merged = (width > 180)
 
-            # Check if multi-column merged artifact
-            is_merged = (width > 180) or bool(re.search(r'\d{3,}', text))
-            is_roll = (center_y < split_y)
-
-            if is_roll:
-                if is_merged:
-                    m = re.search(r'([0-9xX/\-]{1,2})', text)
-                    if m:
-                        f_cell["rolls"].append(m.group(1))
-                    else:
-                        f_cell["rolls"].append(f"unknown ({text})")
-                else:
-                    f_cell["rolls"].append(text)
+        if not is_merged:
+            assigned_col = get_column_for_x(center_x)
+            if assigned_col == "NAME":
+                continue
+            elif assigned_col == "TTL":
+                digits = re.sub(r'[^0-9]', '', text)
+                if digits and int(digits) > 0 and (r_dict["ttl_value"] == "unknown" or conf > r_dict["ttl_confidence"]):
+                    r_dict["ttl_value"] = digits
+                    r_dict["ttl_confidence"] = conf
             else:
-                if is_merged:
-                    m = re.search(r'(\d{1,3})', text)
-                    if m:
-                        f_cell["cumulative"] = m.group(1)
-                    else:
-                        f_cell["cumulative"] = f"unknown ({text})"
+                f_cell = r_dict["frames"][assigned_col]
+                f_cell["raw_detections"].append(det)
+                if is_roll:
+                    f_cell["rolls"].append(text)
                 else:
                     digits = re.sub(r'[^0-9]', '', text)
                     f_cell["cumulative"] = digits if digits else text
+        else:
+            # Multi-column merged item: split horizontally across frame columns
+            if is_roll:
+                # Group characters into column buckets based on interpolated horizontal position
+                col_chars = {}
+                n = len(text)
+                for i, ch in enumerate(text):
+                    if ch == ' ':
+                        continue
+                    ch_cx = x1 + (i + 0.5) * (width / n)
+                    c_name = get_column_for_x(ch_cx)
+                    if c_name.startswith("F"):
+                        col_chars.setdefault(c_name, []).append(ch)
+                for c_name, chars in col_chars.items():
+                    f_cell = r_dict["frames"][c_name]
+                    f_cell["raw_detections"].append(det)
+                    token = "".join(chars)
+                    f_cell["rolls"].append(token)
+            else:
+                # Cumulative scores merged across columns
+                tokens = [t for t in re.split(r'[\s|]+', text) if t]
+                if len(tokens) == 1 and re.match(r'^\d{4,}$', text):
+                    tokens = [text[i:i+2] for i in range(0, len(text), 2)]
+                tok_span = width / max(1, len(tokens))
+                for i, tok in enumerate(tokens):
+                    tok_cx = x1 + (i + 0.5) * tok_span
+                    c_name = get_column_for_x(tok_cx)
+                    if c_name.startswith("F"):
+                        digits = re.sub(r'[^0-9]', '', tok)
+                        if digits:
+                            f_cell = r_dict["frames"][c_name]
+                            f_cell["raw_detections"].append(det)
+                            f_cell["cumulative"] = digits
 
     return rows
