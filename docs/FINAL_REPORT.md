@@ -132,8 +132,6 @@ The overhead scoreboard exhibits a rigid structural geometry comprising 4 horizo
 | **Frames 1–10 Columns** | $200 \le X < 1630\text{ px}$ | 10 individual frame columns (each ~140 px width). |
 | **Total Column (TTL)** | $1630 \le X \le 1820\text{ px}$ | Rightmost cumulative total score column. |
 
-![Figure 3 — Spatial grid calibration and OCR bounding-box assignment](figures/fig2_spatial_grid_debug.png)  
-*Figure 3 — Spatial grid calibration and OCR bounding-box assignment across the four-player scoreboard.*
 
 ---
 
@@ -148,9 +146,6 @@ During system development, an OCR evaluation stage was executed across 6 represe
 | **Total Text Elements Detected** | 232 text elements across evaluation frames |
 | **Overall Average Confidence** | **98.05%** |
 
-![Figure 4 — Quantitative OCR evaluation report](figures/fig5_ocr_evaluation_results.png)  
-*Figure 4 — Quantitative OCR evaluation report showing per-frame text detection counts and 98.05% average confidence.*  
-*Note: Frame 40.0s (frame 1200) occurred during a camera cutaway/transition, correctly yielding low confidence (29.29%) and 1 detection, which is gracefully handled and filtered by the visibility detector.*
 
 ---
 
@@ -167,8 +162,6 @@ A transient bad OCR reading must never reset confirmed scores. For instance, if 
 ### Dynamic In-Game Score Updates (Vishal & Jagdish Frame 5):
 At $t \approx 36.0\text{s}$, player Jagdish rolls a strike 'X' in Frame 5 (updating TTL to 41). At $t \approx 52.2\text{s}$, player Vishal completes Frame 5, rolling a 9- and incrementing his cumulative score from 28 to 37 (TTL = 37). The aggregator identifies these valid monotonic increases and updates player states accordingly.
 
-![Figure 5 — Spatial cell mapping across timestamps capturing state updates](figures/fig6_spatial_mapping_samples.png)  
-*Figure 5 — Spatial cell mapping across timestamps capturing state updates and cutaway handling.*
 
 ---
 
@@ -198,7 +191,7 @@ python run_pipeline.py --video bowling_scoreboard.mp4
 | ![Tracking](figures/screenshot_code_running_tracking.png) | ![Cutaway](figures/screenshot_code_running_cutaway.png) | ![Updates](figures/screenshot_code_running_updates.png) |
 | *Frame-by-frame tracking* | *Camera cutaway rejection* | *Mid-video dynamic updates* |
 
-*Figure 6 — Execution stream: (Top) Startup & PP-OCRv6 initialization; (Bottom Left) Frame tracking; (Bottom Center) Cutaway suppression; (Bottom Right) Dynamic mid-video score updates.*
+
 
 ---
 
