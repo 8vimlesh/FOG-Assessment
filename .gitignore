@@ -1,4 +1,30 @@
+# Virtual environments
 .venv/
+venv/
+env/
+
+# Python cache & bytecode
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Deep Learning / Paddle caches
 .paddlex/
+.paddleocr/
+
+# OS / System artifacts
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.swp
+
+# Logs & terminal dumps
+*.log
+run_log.txt
+
+# Environment variables
+.env
+
+# Large video files (hosted externally on Google Drive)
+*.mp4

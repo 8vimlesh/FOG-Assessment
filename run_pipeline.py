@@ -104,11 +104,15 @@ def main():
 
                 if need_ocr:
                     prep_img = preprocess_pipeline_clahe(crop_bgr, scale=1.0)
-                    prep_path = os.path.join(args.debug_dir, "preprocessed", f"prep_frame_{actual_ts:04.1f}s.png")
-                    os.makedirs(os.path.dirname(prep_path), exist_ok=True)
+                    prep_path = os.path.join(args.debug_dir, f"_temp_prep.png")
                     cv2.imwrite(prep_path, prep_img)
 
                     raw_ocr = ocr_processor.run_ocr(prep_path)
+                    if os.path.exists(prep_path):
+                        try:
+                            os.remove(prep_path)
+                        except Exception:
+                            pass
                     if len(raw_ocr) < 15:
                         is_visible = False
                         ocr_data = {
