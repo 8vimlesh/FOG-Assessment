@@ -2,22 +2,28 @@
 FINAL EXTRACTION ACCURACY VALIDATION REPORT
 ====================================================
 
-Total Scoreboard Cells Checked : 33
-Visually Verified Cells         : 33
-Unplayed / Unknown Cells        : 18
-Corrected OCR Artifact Cells    : 2
+Total Scoreboard Cells Evaluated : 44 (4 Players x 11 Columns)
+Played Frame Cells Extracted     : 18
+Unplayed / Future Frame Cells    : 22 (Explicitly preserved as null / unplayed)
+Mathematical Consistency Checks  : PASS (0 mismatches across all frames)
 
 --- VERIFIED SCORE VALUES ---
-  JAGDISH : F1=15, F2=20, F3=27, F4=31, TTL=31 (Bowling Math: 15+5=20, +7=27, +4=31)
-  VISHAL  : F1=8, F2=11, F3=19, F4=28, F5=37, TTL=28/37 (Bowling Math: 8+3=11, +8=19, +9=28, +9=37)
-  TARUN   : F1=20, F2=39, F3=48, F4=54, TTL=54 (Bowling Math: 20+19=39, +9=48, +6=54)
+  JAGDISH       (Row 1, 'J') : F1=X(15), F2=5-(20), F3=-7(27), F4=4-(31), F5=X(41), TTL=41
+  VISHAL        (Row 2, 'V') : F1=8-(8), F2=3-(11), F3=71(19), F4=81(28), F5=9-(37), TTL=37
+  UNKNOWN_ROW_3 (Row 3, 'P') : F1=X(20), F2=4/(39), F3=9-(48), F4=6-(54), TTL=54
+  TARUN         (Row 4, 'T') : F1=61(7), F2=1/(25), F3=8-(33), F4=34(40), TTL=40
 
---- CORRECTED OCR ARTIFACTS ---
-  1. Tarun Row Boundary Correction: Y-range 447..605 separated Tarun's row from Row 4 screen text.
-  2. Jagdish F3 Roll Artifact '-74-': Multi-column OCR merge flagged as unknown, cumulative score 27 preserved.
-  3. Vishal F3 Roll Artifact '71' & F4 Roll Artifact '81': Font artifacts for '8-' and '9-' flagged, cumulative scores 19 & 28 preserved.
+--- DYNAMIC NAME DISCOVERY ---
+  - Row 1: JAGDISH (active highlight + header OCR at ts 26.4s..35.8s)
+  - Row 2: VISHAL (active highlight + header OCR at ts 36.0s, 44.6s, 52.2s)
+  - Row 3: UNKNOWN_ROW_3 (row marker 'P', no active broadcast turn observed in clip)
+  - Row 4: TARUN (active highlight + header OCR at ts 0.0s..3.8s, 7.2s..22.8s)
 
---- UNCERTAIN / UNPLAYED CELLS ---
-  - F5 through F10 for Jagdish and Tarun remain unknown/unplayed as required (no fake data created).
+--- MULTI-COLUMN SPATIAL DE-MERGING ---
+  - Characters in multi-frame merged bounding boxes (e.g. '5--74-', '4/9-6-') are
+    interpolated proportionally to their respective frame columns with zero column shift.
+
+--- UNPLAYED CELLS ---
+  - F6 through F10 for all players, and F5 for Row 3 and Tarun remain unplayed.
 
 ====================================================

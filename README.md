@@ -184,7 +184,7 @@ The pipeline processes video sequentially through a modular, decoupled computer 
 +-------------------------------------------------------------------------------+
 | 5. Spatial Grid Parser & Dynamic Name Discovery (scoreboard_cv/parser.py)     |
 |    - Centroid coordinate assignment across full 840px ROI                     |
-|    - 4 Player Rows: JAGDISH (R1), VISHAL (R2), P / Player 3 (R3), TARUN (R4)  |
+|    - 4 Player Rows: JAGDISH (R1), VISHAL (R2), UNKNOWN_ROW_3 (R3), TARUN (R4) |
 |    - 11 Columns: Frames 1–10 + Total Score (TTL)                              |
 |    - Dynamic Header Name + Active-Row Highlight Association                   |
 +-------------------------------------------------------------------------------+
@@ -318,7 +318,7 @@ Y-Boundaries (Horizontal Rows):
   [  0 - 135 px] -> Header Row (Active Bowler Banner, Frame Headers 1-10, TTL)
   [135 - 290 px] -> Player Row 1 (JAGDISH - 'J')
   [290 - 460 px] -> Player Row 2 (VISHAL - 'V')
-  [460 - 630 px] -> Player Row 3 (P / Player 3 - 'P')
+  [460 - 630 px] -> Player Row 3 (UNKNOWN_ROW_3 - 'P')
   [630 - 830 px] -> Player Row 4 (TARUN - 'T')
 
 X-Boundaries (Vertical Columns):
@@ -346,7 +346,7 @@ Rather than hardcoding static row-to-name bindings, player names are dynamically
    - When Row 1 is highlighted during active play $\rightarrow$ Discovered: **`JAGDISH`**
    - When Row 2 is highlighted during active play $\rightarrow$ Discovered: **`VISHAL`**
    - When Row 4 is highlighted during active play $\rightarrow$ Discovered: **`TARUN`**
-   - When a row's active turn is not broadcast within the clip (Row 3, label `'P'`) $\rightarrow$ Designated honestly as **`P (Player 3)`** rather than guessing.
+   - When a row's active turn is not broadcast within the clip (Row 3, label `'P'`) $\rightarrow$ Designated honestly as **`UNKNOWN_ROW_3`** (undetermined bowler name; no active broadcast turn observed in this clip) rather than forcing an unverified guess.
 
 ---
 
@@ -359,10 +359,10 @@ Within each player-frame cell, vertical position distinguishes individual rolls 
 ### Cell Decomposition Examples:
 - **Jagdish (Row 1) Frame 1**: Upper Roll = `X` | Lower Cumulative = `15`
 - **Vishal (Row 2) Frame 2**: Upper Roll = `3-` | Lower Cumulative = `11`
-- **P (Row 3) Frame 2**: Upper Roll = `4/` | Lower Cumulative = `39`
+- **UNKNOWN_ROW_3 (Row 3) Frame 2**: Upper Roll = `4/` | Lower Cumulative = `39`
 - **Tarun (Row 4) Frame 2**: Upper Roll = `1/` | Lower Cumulative = `25`
 
-Unplayed frames (Frames 5–10 for Jagdish, P, and Tarun; Frames 6–10 for Vishal) are explicitly maintained as `null` / `unplayed`.
+Unplayed frames (Frames 6–10 for Jagdish, Row 3, and Tarun; Frames 6–10 for Vishal) are explicitly maintained as `null` / `unplayed`.
 
 ---
 
@@ -444,7 +444,12 @@ FOG-Assessment/
 ```bash
 git clone https://github.com/8vimlesh/FOG-Assessment.git
 cd FOG-Assessment
+
+# If using Git LFS for video files:
+git lfs install
+git lfs pull
 ```
+> *Note*: If `git-lfs` is not installed on your system, you can directly download the video files via the Google Drive mirrors provided above.
 
 ### 2. Create Virtual Environment
 ```powershell
